@@ -76,6 +76,7 @@ export class TelegramService {
 
   public onBriefingRequested?: (chatId: string) => Promise<string>;
   public onDiagnosticsRequested?: () => Promise<string>;
+  public onSwarmRequested?: (targetAndTask?: string) => Promise<string>;
 
   private sanitize(input: unknown): string {
     const str = input instanceof Error ? input.message : String(input);
@@ -330,7 +331,7 @@ export class TelegramService {
     if (rawText.startsWith('/start')) {
       await this.sendMessage(
         chatId,
-        `👋 *OpenDots Mobile Conectado!*\n\n🤖 *Dot Ativo:* ${dot.name}\n\n*Comandos Rápidos:*\n• /briefing - Gerar briefing executivo proativo\n• /health - Diagnóstico completo do Watchdog 24/7\n• /dots - Listar Dots disponíveis\n• /use <nome> - Trocar o Dot da conversa\n• /new - Reiniciar o tópico da conversa\n• /status - Uptime e memória\n\nEnvie mensagens de texto ou **áudios** para interagir diretamente.`,
+        `👋 *OpenDots Mobile Conectado!*\n\n🤖 *Dot Ativo:* ${dot.name}\n\n*Comandos Rápidos:*\n• /briefing - Gerar briefing executivo proativo\n• /health - Diagnóstico completo do Watchdog 24/7\n• /swarm - Visão do Swarm Multi-Agente & delegação\n• /dots - Listar Dots disponíveis\n• /use <nome> - Trocar o Dot da conversa\n• /new - Reiniciar o tópico da conversa\n• /status - Uptime e memória\n\nEnvie mensagens de texto ou **áudios** para interagir diretamente.`,
         'Markdown',
       );
       return;
@@ -361,6 +362,22 @@ export class TelegramService {
         }
       } else {
         await this.sendMessage(chatId, 'Watchdog não configurado.');
+      }
+      return;
+    }
+
+    if (rawText.startsWith('/swarm')) {
+      const rest = rawText.replace(/^\/swarm\s*/, '').trim();
+      void this.sendChatAction(chatId, 'typing');
+      if (this.onSwarmRequested) {
+        try {
+          const swarmReport = await this.onSwarmRequested(rest || undefined);
+          await this.sendMessage(chatId, swarmReport, 'Markdown');
+        } catch {
+          await this.sendMessage(chatId, '⚠️ Falha ao processar comando do Swarm.');
+        }
+      } else {
+        await this.sendMessage(chatId, 'Serviço de Swarm não configurado.');
       }
       return;
     }

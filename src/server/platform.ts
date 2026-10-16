@@ -23,12 +23,14 @@ import {
 import { validateRuntimeScope } from './runtime-scope.js';
 import { learningSelector } from './learning.js';
 import { SetupTelemetry } from './setup-telemetry.js';
+import { SwarmService } from './swarm.js';
 export class Platform {
   private channelStartupFailed = false;
   readonly setupTelemetry: SetupTelemetry;
   readonly pages: PageService;
   readonly computers: ComputerService;
   readonly connections: ConnectionService;
+  readonly swarm: SwarmService;
   readonly intelligence?: CopilotKitIntelligence;
   readonly handler?: CopilotHonoApp;
   constructor(
@@ -43,6 +45,11 @@ export class Platform {
       () => store.settings().paused,
     );
     this.connections = new ConnectionService(workspace.connections);
+    this.swarm = new SwarmService(
+      workspace,
+      (threadId, prompt, signal, metadata) =>
+        this.turn(threadId, prompt, signal, metadata),
+    );
     this.pages = new PageService(workspace, () => {
       this.requireReady();
       if (this.intelligence) return this.intelligence;
@@ -90,6 +97,7 @@ export class Platform {
             dotId,
             true,
             this.setupTelemetry,
+            this.swarm,
           ),
       });
       channels.push(slack);
@@ -115,6 +123,7 @@ export class Platform {
                 dot.id,
                 false,
                 this.setupTelemetry,
+                this.swarm,
               ),
             ]),
         ),
@@ -283,6 +292,7 @@ export class Platform {
       dotId,
       false,
       this.setupTelemetry,
+      this.swarm,
     );
     let text = '';
     let runError: Error | undefined;

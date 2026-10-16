@@ -143,6 +143,50 @@ telegram.onDiagnosticsRequested = async () => {
     `• Falhas Consecutivas: \`${diag.consecutiveFailures}\``,
   ].join('\n');
 };
+telegram.onSwarmRequested = async (arg?: string) => {
+  if (arg) {
+    const parts = arg.split(/\s+/);
+    const target = parts[0];
+    const task = parts.slice(1).join(' ');
+    if (!task) {
+      return `⚠️ Informe a tarefa após o nome do Dot. Exemplo:\n\`/swarm CineDot Crie um gancho de 3s sobre produtividade\``;
+    }
+    const dots = workspace.dots();
+    const fromId = dots[0]?.id ?? 'telegram';
+    const result = await platform.swarm.delegate(fromId, target, task);
+    return [
+      `🐝 *RESULTADO DA DELEGAÇÃO SWARM*`,
+      `• Especialista: *${result.toDotName}*`,
+      `• Duração: \`${result.durationMs}ms\``,
+      `• Tarefa: _"${task}"_`,
+      `\n${result.result}`,
+    ].join('\n');
+  }
+
+  const roster = platform.swarm.getRoster();
+  const recentLogs = platform.swarm.getHistory(3);
+  const rosterLines = roster
+    .map((d) => `• *${d.name}*: _${d.instructions.slice(0, 100)}..._`)
+    .join('\n');
+  const logLines = recentLogs.length
+    ? recentLogs
+        .map(
+          (l) =>
+            `• [${l.fromDotName} ➔ ${l.toDotName}]: ${l.status === 'completed' ? '✅' : '❌'} (${l.durationMs}ms)`,
+        )
+        .join('\n')
+    : '• Nenhuma delegação recente.';
+
+  return [
+    `🐝 *OPENDOTS MULTI-AGENT SWARM*`,
+    `\n🤖 *Especialistas Disponíveis:*`,
+    rosterLines,
+    `\n📋 *Atividade Recente:*`,
+    logLines,
+    `\n💡 *Como Delegar:*`,
+    `Envie: \`/swarm <Dot> <tarefa>\` ou peça normalmente em qualquer conversa.`,
+  ].join('\n');
+};
 const wsOrigin = new URL(
   config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
 ).origin;
@@ -185,6 +229,7 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
         [safeFailure(error)],
       ),
     );
+  platform.swarm.seedSpecialists();
   watchdog.start();
   briefing.start();
 });

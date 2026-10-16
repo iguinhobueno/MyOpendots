@@ -114,6 +114,49 @@ export function createApp({
       dots: platform?.workspace.dots().length ?? 0,
     });
   });
+  app.get('/api/swarm/dots', (c) => {
+    const dots = platform?.swarm.getRoster() ?? [];
+    return c.json({ dots });
+  });
+  app.get('/api/swarm/logs', (c) => {
+    const limit = Math.min(Number(c.req.query('limit') ?? 50), 100);
+    const logs = platform?.swarm.getHistory(limit) ?? [];
+    return c.json({ logs });
+  });
+  app.post('/api/swarm/delegate', async (c) => {
+    if (!platform) {
+      return c.json({ error: 'Platform not configured.' }, 503);
+    }
+    const schema = z.object({
+      fromDotId: z.string().optional(),
+      target: z.string().min(1),
+      task: z.string().min(1).max(4000),
+      context: z.string().max(4000).optional(),
+    });
+    const parsed = schema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return c.json({ error: 'Invalid payload: target and task are required.' }, 400);
+    }
+    const dots = platform.workspace.dots();
+    const fromId = parsed.data.fromDotId ?? dots[0]?.id;
+    if (!fromId) {
+      return c.json({ error: 'No source Dot available in workspace.' }, 400);
+    }
+    try {
+      const result = await platform.swarm.delegate(
+        fromId,
+        parsed.data.target,
+        parsed.data.task,
+        parsed.data.context,
+      );
+      return c.json(result);
+    } catch (err) {
+      return c.json(
+        { error: err instanceof Error ? err.message : String(err) },
+        400,
+      );
+    }
+  });
   app.get('/api/state', (c) =>
     c.json({
       settings: store.settings(),

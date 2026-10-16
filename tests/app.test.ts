@@ -278,3 +278,15 @@ it('returns production health metrics on /api/health', async () => {
   expect(data.memory.heapUsedMb).toBeGreaterThan(0);
   expect(typeof data.tasks).toBe('number');
 });
+it('returns swarm roster and delegation logs via /api/swarm', async () => {
+  const { app } = fixture();
+  const dotsRes = await app.request('/api/swarm/dots');
+  expect(dotsRes.status).toBe(200);
+  const dotsData = (await dotsRes.json()) as any;
+  expect(Array.isArray(dotsData.dots)).toBe(true);
+
+  const logsRes = await app.request('/api/swarm/logs');
+  expect(logsRes.status).toBe(200);
+  const logsData = (await logsRes.json()) as any;
+  expect(Array.isArray(logsData.logs)).toBe(true);
+});

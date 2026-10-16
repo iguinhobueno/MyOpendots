@@ -27,7 +27,9 @@ export class WorkspaceStore {
       CREATE TABLE IF NOT EXISTS captures(threadId TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, createdAt INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS idx_messages_threadId ON messages(threadId);
-      CREATE TABLE IF NOT EXISTS telegram_chats(chatId TEXT PRIMARY KEY, threadId TEXT NOT NULL, dotId TEXT NOT NULL, updatedAt INTEGER NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS telegram_chats(chatId TEXT PRIMARY KEY, threadId TEXT NOT NULL, dotId TEXT NOT NULL, updatedAt INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS swarm_delegations(id TEXT PRIMARY KEY, fromDotId TEXT NOT NULL, fromDotName TEXT NOT NULL, toDotId TEXT NOT NULL, toDotName TEXT NOT NULL, task TEXT NOT NULL, status TEXT NOT NULL, result TEXT, error TEXT, durationMs INTEGER NOT NULL, createdAt INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS idx_swarm_delegations_createdAt ON swarm_delegations(createdAt);`);
     for (const [table, column, definition] of [
       ['dots', 'learningContainerId', 'TEXT'],
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
@@ -119,6 +121,12 @@ export class WorkspaceStore {
   }
   dot(id: string) {
     return this.dots().find((dot) => dot.id === id);
+  }
+  findDotByName(name: string): Dot | undefined {
+    const q = name.trim().toLowerCase();
+    return this.dots().find(
+      (dot) => dot.name.toLowerCase() === q || dot.id.toLowerCase() === q,
+    );
   }
   createDot(
     spaceId: string,
@@ -436,5 +444,55 @@ export class WorkspaceStore {
         'INSERT OR REPLACE INTO telegram_chats (chatId, threadId, dotId, updatedAt) VALUES (?, ?, ?, ?)',
       )
       .run(chatId, threadId, dotId, Date.now());
+  }
+  saveSwarmDelegation(record: {
+    id: string;
+    fromDotId: string;
+    fromDotName: string;
+    toDotId: string;
+    toDotName: string;
+    task: string;
+    status: 'completed' | 'failed';
+    result?: string;
+    error?: string;
+    durationMs: number;
+    createdAt?: number;
+  }) {
+    this.db
+      .prepare(
+        'INSERT INTO swarm_delegations (id, fromDotId, fromDotName, toDotId, toDotName, task, status, result, error, durationMs, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        record.id,
+        record.fromDotId,
+        record.fromDotName,
+        record.toDotId,
+        record.toDotName,
+        record.task,
+        record.status,
+        record.result ?? null,
+        record.error ?? null,
+        record.durationMs,
+        record.createdAt ?? Date.now(),
+      );
+  }
+  swarmDelegations(limit = 50) {
+    return this.db
+      .prepare(
+        'SELECT * FROM swarm_delegations ORDER BY createdAt DESC LIMIT ?',
+      )
+      .all(limit) as unknown as Array<{
+        id: string;
+        fromDotId: string;
+        fromDotName: string;
+        toDotId: string;
+        toDotName: string;
+        task: string;
+        status: 'completed' | 'failed';
+        result: string | null;
+        error: string | null;
+        durationMs: number;
+        createdAt: number;
+      }>;
   }
 }

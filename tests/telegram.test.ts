@@ -313,4 +313,24 @@ describe('TelegramService', () => {
     expect(service.onDiagnosticsRequested).toHaveBeenCalled();
     expect(spySend).toHaveBeenCalledWith(100, '🛡️ DIAGNÓSTICO: HEALTHY', 'Markdown');
   });
+
+  it('handles /swarm command via onSwarmRequested callback', async () => {
+    const service = new TelegramService(workspace, platform, { botToken: dummyToken });
+    service.onSwarmRequested = vi.fn(async () => '🐝 SWARM ROSTER: CineDot, DevDot');
+    const spySend = vi.spyOn(service, 'sendMessage').mockResolvedValue(undefined);
+
+    await service.handleUpdate({
+      update_id: 10,
+      message: {
+        message_id: 52,
+        from: { id: 100, is_bot: false, first_name: 'Igor' },
+        chat: { id: 100, type: 'private' },
+        date: Date.now(),
+        text: '/swarm CineDot Gancho de 3s',
+      },
+    });
+
+    expect(service.onSwarmRequested).toHaveBeenCalledWith('CineDot Gancho de 3s');
+    expect(spySend).toHaveBeenCalledWith(100, '🐝 SWARM ROSTER: CineDot, DevDot', 'Markdown');
+  });
 });
