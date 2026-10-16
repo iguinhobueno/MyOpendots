@@ -3,6 +3,8 @@ export function createShutdown(options: {
   stopPlatform: () => Promise<void>;
   closeServer: () => Promise<void>;
   stopTelegram?: () => void;
+  stopWatchdog?: () => void;
+  stopBriefing?: () => void;
   exit: (code: number) => void;
   report: (operation: string, error: unknown) => void;
   timeoutMs?: number;
@@ -24,6 +26,16 @@ export function createShutdown(options: {
         options.stopTelegram?.();
       } catch (error) {
         report('Stopping Telegram bot failed', error);
+      }
+      try {
+        options.stopWatchdog?.();
+      } catch (error) {
+        report('Stopping Watchdog failed', error);
+      }
+      try {
+        options.stopBriefing?.();
+      } catch (error) {
+        report('Stopping Briefing service failed', error);
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       const deadline = new Promise<void>((resolve) => {

@@ -267,3 +267,14 @@ it('rejects DNS-rebinding Host even with a matching hostile Origin', async () =>
   });
   expect(response.status).toBe(403);
 });
+it('returns production health metrics on /api/health', async () => {
+  const { app } = fixture();
+  const response = await app.request('/api/health');
+  expect(response.status).toBe(200);
+  const data = (await response.json()) as any;
+  expect(data.status).toBe('ok');
+  expect(typeof data.uptime).toBe('number');
+  expect(data.memory).toBeDefined();
+  expect(data.memory.heapUsedMb).toBeGreaterThan(0);
+  expect(typeof data.tasks).toBe('number');
+});

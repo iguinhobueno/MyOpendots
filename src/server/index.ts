@@ -16,6 +16,8 @@ import {
 } from './platform-config.js';
 import { research } from './research.js';
 import { TelegramService } from './telegram.js';
+import { Watchdog } from './watchdog.js';
+import { BriefingService } from './briefing.js';
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
 const ownerToken = process.env.OWNER_TOKEN;
@@ -76,6 +78,7 @@ export const telegram = new TelegramService(workspace, platform, {
   apiKey: config.apiKey,
   baseUrl: config.baseUrl,
 });
+
 const researchConfig = {
   mode: 'live' as const,
   apiKey: config.apiKey,
@@ -111,6 +114,35 @@ const runner = new Runner(
     return result;
   },
 );
+export const watchdog = new Watchdog(workspace, store, runner, telegram, {
+  checkIntervalMs: Number(process.env.WATCHDOG_INTERVAL_MS ?? 60_000),
+  maxHeapBytes: Number(process.env.WATCHDOG_MAX_HEAP_MB ?? 512) * 1024 * 1024,
+});
+export const briefing = new BriefingService(
+  workspace,
+  store,
+  platform,
+  telegram,
+  {
+    scheduledTime: process.env.BRIEFING_TIME ?? '08:00',
+    targetChatId: config.telegramDefaultChatId,
+    defaultDotId: config.telegramDotId,
+  },
+);
+telegram.onBriefingRequested = async () => briefing.generateBriefing();
+telegram.onDiagnosticsRequested = async () => {
+  const diag = await watchdog.diagnose();
+  return [
+    '🛡️ *DIAGNÓSTICO WATCHDOG 24/7*',
+    `• Status: *${diag.status.toUpperCase()}*`,
+    `• Uptime: \`${diag.uptimeSeconds}s\``,
+    `• Memória Heap: \`${diag.memory.heapUsedMb} MB\` (Limite: ${diag.memory.heapLimitMb} MB)`,
+    `• RSS: \`${diag.memory.rssMb} MB\``,
+    `• Banco SQLite: \`${diag.database.status}\` (Latência: \`${diag.database.latencyMs}ms\`)`,
+    `• Tarefas Pendentes: \`${diag.scheduler.pendingTasks}\``,
+    `• Falhas Consecutivas: \`${diag.consecutiveFailures}\``,
+  ].join('\n');
+};
 const wsOrigin = new URL(
   config.intelligenceWsUrl ?? 'wss://realtime.intelligence.copilotkit.ai',
 ).origin;
@@ -153,11 +185,15 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
         [safeFailure(error)],
       ),
     );
+  watchdog.start();
+  briefing.start();
 });
 const shutdown = createShutdown({
   stopRunner: () => runner.stop(),
   stopPlatform: () => platform.stop(),
   stopTelegram: () => telegram.stop(),
+  stopWatchdog: () => watchdog.stop(),
+  stopBriefing: () => briefing.stop(),
   closeServer: () =>
     new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

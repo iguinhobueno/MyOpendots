@@ -74,6 +74,9 @@ export class TelegramService {
     return Boolean(this.config.botToken && this.config.botToken.trim());
   }
 
+  public onBriefingRequested?: (chatId: string) => Promise<string>;
+  public onDiagnosticsRequested?: () => Promise<string>;
+
   private sanitize(input: unknown): string {
     const str = input instanceof Error ? input.message : String(input);
     if (!this.config.botToken) return str;
@@ -327,9 +330,38 @@ export class TelegramService {
     if (rawText.startsWith('/start')) {
       await this.sendMessage(
         chatId,
-        `👋 *OpenDots Mobile Conectado!*\n\n🤖 *Dot Ativo:* ${dot.name}\n\n*Comandos Rápidos:*\n• /dots - Listar Dots disponíveis\n• /use <nome> - Trocar o Dot da conversa\n• /new - Reiniciar o tópico da conversa\n• /status - Diagnóstico do sistema 24/7\n\nEnvie mensagens de texto ou **áudios** para interagir diretamente.`,
+        `👋 *OpenDots Mobile Conectado!*\n\n🤖 *Dot Ativo:* ${dot.name}\n\n*Comandos Rápidos:*\n• /briefing - Gerar briefing executivo proativo\n• /health - Diagnóstico completo do Watchdog 24/7\n• /dots - Listar Dots disponíveis\n• /use <nome> - Trocar o Dot da conversa\n• /new - Reiniciar o tópico da conversa\n• /status - Uptime e memória\n\nEnvie mensagens de texto ou **áudios** para interagir diretamente.`,
         'Markdown',
       );
+      return;
+    }
+
+    if (rawText.startsWith('/briefing')) {
+      void this.sendChatAction(chatId, 'typing');
+      if (this.onBriefingRequested) {
+        try {
+          const briefing = await this.onBriefingRequested(String(chatId));
+          await this.sendMessage(chatId, `🌅 *BRIEFING EXECUTIVO*\n\n${briefing}`, 'Markdown');
+        } catch (err) {
+          await this.sendMessage(chatId, '⚠️ Falha ao gerar briefing executivo no momento.');
+        }
+      } else {
+        await this.sendMessage(chatId, 'Serviço de briefing proativo não configurado.');
+      }
+      return;
+    }
+
+    if (rawText.startsWith('/health') || rawText.startsWith('/watchdog')) {
+      if (this.onDiagnosticsRequested) {
+        try {
+          const diag = await this.onDiagnosticsRequested();
+          await this.sendMessage(chatId, diag, 'Markdown');
+        } catch {
+          await this.sendMessage(chatId, '⚠️ Falha ao obter diagnóstico do Watchdog.');
+        }
+      } else {
+        await this.sendMessage(chatId, 'Watchdog não configurado.');
+      }
       return;
     }
 

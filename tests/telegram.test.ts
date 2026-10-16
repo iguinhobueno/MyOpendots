@@ -269,4 +269,48 @@ describe('TelegramService', () => {
       'Markdown',
     );
   });
+
+  it('handles /briefing command via onBriefingRequested callback', async () => {
+    const service = new TelegramService(workspace, platform, { botToken: dummyToken });
+    service.onBriefingRequested = vi.fn(async () => 'Status: Tudo excelente.');
+    const spySend = vi.spyOn(service, 'sendMessage').mockResolvedValue(undefined);
+
+    await service.handleUpdate({
+      update_id: 8,
+      message: {
+        message_id: 50,
+        from: { id: 100, is_bot: false, first_name: 'Igor' },
+        chat: { id: 100, type: 'private' },
+        date: Date.now(),
+        text: '/briefing',
+      },
+    });
+
+    expect(service.onBriefingRequested).toHaveBeenCalledWith('100');
+    expect(spySend).toHaveBeenCalledWith(
+      100,
+      expect.stringContaining('Status: Tudo excelente.'),
+      'Markdown',
+    );
+  });
+
+  it('handles /health command via onDiagnosticsRequested callback', async () => {
+    const service = new TelegramService(workspace, platform, { botToken: dummyToken });
+    service.onDiagnosticsRequested = vi.fn(async () => '🛡️ DIAGNÓSTICO: HEALTHY');
+    const spySend = vi.spyOn(service, 'sendMessage').mockResolvedValue(undefined);
+
+    await service.handleUpdate({
+      update_id: 9,
+      message: {
+        message_id: 51,
+        from: { id: 100, is_bot: false, first_name: 'Igor' },
+        chat: { id: 100, type: 'private' },
+        date: Date.now(),
+        text: '/health',
+      },
+    });
+
+    expect(service.onDiagnosticsRequested).toHaveBeenCalled();
+    expect(spySend).toHaveBeenCalledWith(100, '🛡️ DIAGNÓSTICO: HEALTHY', 'Markdown');
+  });
 });

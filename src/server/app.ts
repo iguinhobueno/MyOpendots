@@ -98,6 +98,22 @@ export function createApp({
     );
   const voice = platform ? new VoiceService(platform) : undefined;
   if (platform && voice) app.route('/api', workspaceRoutes(platform, voice));
+  app.get('/api/health', (c) => {
+    const mem = process.memoryUsage();
+    return c.json({
+      status: 'ok',
+      uptime: Math.floor(process.uptime()),
+      timestamp: Date.now(),
+      memory: {
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+      },
+      tasks: store.tasks().length,
+      spaces: platform?.workspace.spaces().length ?? 0,
+      dots: platform?.workspace.dots().length ?? 0,
+    });
+  });
   app.get('/api/state', (c) =>
     c.json({
       settings: store.settings(),
