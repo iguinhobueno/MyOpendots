@@ -26,7 +26,8 @@ export class WorkspaceStore {
       CREATE TABLE IF NOT EXISTS calls(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, startedAt INTEGER NOT NULL, endedAt INTEGER, status TEXT NOT NULL, transcript TEXT NOT NULL, error TEXT);
       CREATE TABLE IF NOT EXISTS captures(threadId TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, createdAt INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS idx_messages_threadId ON messages(threadId);`);
+      CREATE INDEX IF NOT EXISTS idx_messages_threadId ON messages(threadId);
+      CREATE TABLE IF NOT EXISTS telegram_chats(chatId TEXT PRIMARY KEY, threadId TEXT NOT NULL, dotId TEXT NOT NULL, updatedAt INTEGER NOT NULL);`);
     for (const [table, column, definition] of [
       ['dots', 'learningContainerId', 'TEXT'],
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
@@ -404,5 +405,36 @@ export class WorkspaceStore {
       content: string;
       createdAt: number;
     }[];
+  }
+  telegramChat(
+    chatId: string,
+  ): { chatId: string; threadId: string; dotId: string; updatedAt: number } | null {
+    const row = this.db
+      .prepare(
+        'SELECT chatId, threadId, dotId, updatedAt FROM telegram_chats WHERE chatId = ?',
+      )
+      .get(chatId) as
+      | { chatId?: string; threadId?: string; dotId?: string; updatedAt?: number }
+      | undefined;
+    return row &&
+      row.chatId &&
+      row.threadId &&
+      row.dotId &&
+      typeof row.updatedAt === 'number'
+      ? {
+          chatId: row.chatId,
+          threadId: row.threadId,
+          dotId: row.dotId,
+          updatedAt: row.updatedAt,
+        }
+      : null;
+  }
+  bindTelegramChat(chatId: string, threadId: string, dotId: string) {
+    this.requireThread(threadId);
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO telegram_chats (chatId, threadId, dotId, updatedAt) VALUES (?, ?, ?, ?)',
+      )
+      .run(chatId, threadId, dotId, Date.now());
   }
 }

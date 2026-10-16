@@ -15,6 +15,7 @@ import {
   type PlatformConfig,
 } from './platform-config.js';
 import { research } from './research.js';
+import { TelegramService } from './telegram.js';
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
 const ownerToken = process.env.OWNER_TOKEN;
@@ -56,10 +57,25 @@ const config: PlatformConfig = {
     .map((value) => value.trim())
     .filter(Boolean),
   slackDotId: process.env.SLACK_DOT_ID || undefined,
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || undefined,
+  telegramAllowedUsers: (process.env.TELEGRAM_ALLOWED_USERS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
+  telegramDotId: process.env.TELEGRAM_DOT_ID || undefined,
+  telegramDefaultChatId: process.env.TELEGRAM_CHAT_ID || undefined,
   runtimeUrl: `http://${host === '::1' ? '[::1]' : '127.0.0.1'}:${port}/api/copilotkit`,
   ownerToken,
 };
 const platform = new Platform(store, workspace, config);
+export const telegram = new TelegramService(workspace, platform, {
+  botToken: config.telegramBotToken,
+  allowedUsers: config.telegramAllowedUsers,
+  defaultChatId: config.telegramDefaultChatId,
+  defaultDotId: config.telegramDotId,
+  apiKey: config.apiKey,
+  baseUrl: config.baseUrl,
+});
 const researchConfig = {
   mode: 'live' as const,
   apiKey: config.apiKey,
@@ -129,10 +145,19 @@ const server = serve({ fetch: app.fetch, hostname: host, port }, (info) => {
         [safeFailure(error)],
       ),
     );
+  void telegram
+    .start()
+    .catch((error) =>
+      reportChannelFailure(
+        'Telegram bot service failed to start',
+        [safeFailure(error)],
+      ),
+    );
 });
 const shutdown = createShutdown({
   stopRunner: () => runner.stop(),
   stopPlatform: () => platform.stop(),
+  stopTelegram: () => telegram.stop(),
   closeServer: () =>
     new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

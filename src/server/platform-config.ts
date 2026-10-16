@@ -54,6 +54,10 @@ export interface PlatformConfig extends WebConfig {
   slackTeam?: string;
   slackUsers: string[];
   slackDotId?: string;
+  telegramBotToken?: string;
+  telegramAllowedUsers?: string[];
+  telegramDotId?: string;
+  telegramDefaultChatId?: string;
   runtimeUrl: string;
   ownerToken?: string;
 }

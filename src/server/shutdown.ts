@@ -2,6 +2,7 @@ export function createShutdown(options: {
   stopRunner: () => void;
   stopPlatform: () => Promise<void>;
   closeServer: () => Promise<void>;
+  stopTelegram?: () => void;
   exit: (code: number) => void;
   report: (operation: string, error: unknown) => void;
   timeoutMs?: number;
@@ -18,6 +19,11 @@ export function createShutdown(options: {
         options.stopRunner();
       } catch (error) {
         report('Stopping scheduler failed', error);
+      }
+      try {
+        options.stopTelegram?.();
+      } catch (error) {
+        report('Stopping Telegram bot failed', error);
       }
       let timer: ReturnType<typeof setTimeout> | undefined;
       const deadline = new Promise<void>((resolve) => {
