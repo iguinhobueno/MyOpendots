@@ -7,8 +7,10 @@ import {
   ArrowUp,
   ArrowUpRight,
   BookOpen,
+  Bot,
   Clock3,
   Code2,
+  Film,
   Folder,
   Menu,
   MessageCircle,
@@ -20,9 +22,13 @@ import {
   Plus,
   Search,
   Settings2,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
+import { SwarmView } from './SwarmView';
+import { WatchdogView } from './WatchdogView';
+import { CineDotStudio } from './CineDotStudio';
 import type {
   Conversation,
   Detail,
@@ -62,9 +68,15 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceState>();
   const [selectedDot, setSelectedDot] = useState('');
   const [selectedThread, setSelectedThread] = useState<string>();
-  const [view, rawSetView] = useState<'chat' | 'tasks' | 'memories' | 'space'>(
-    'chat',
-  );
+  const [view, rawSetView] = useState<
+    | 'chat'
+    | 'tasks'
+    | 'memories'
+    | 'space'
+    | 'swarm'
+    | 'watchdog'
+    | 'studio'
+  >('chat');
   const dirtyPage = useRef(false);
   const [spaceId, setSpaceId] = useState('');
   const [pageId, setPageId] = useState<string>();
@@ -473,6 +485,36 @@ export function App() {
         )}
         <div className="sidebar-bottom">
           <button
+            className={`nav-item ${view === 'swarm' ? 'active' : ''}`}
+            onClick={() => {
+              setView('swarm');
+              setMobile(false);
+            }}
+          >
+            <Bot size={17} />
+            <span>Swarm Multi-Agente</span>
+          </button>
+          <button
+            className={`nav-item ${view === 'watchdog' ? 'active' : ''}`}
+            onClick={() => {
+              setView('watchdog');
+              setMobile(false);
+            }}
+          >
+            <ShieldCheck size={17} />
+            <span>Guardião 24/7</span>
+          </button>
+          <button
+            className={`nav-item ${view === 'studio' ? 'active' : ''}`}
+            onClick={() => {
+              setView('studio');
+              setMobile(false);
+            }}
+          >
+            <Film size={17} />
+            <span>CineDot Studio</span>
+          </button>
+          <button
             className={`nav-item ${view === 'tasks' ? 'active' : ''}`}
             onClick={() => {
               setView('tasks');
@@ -531,7 +573,9 @@ export function App() {
             <span>
               {view === 'space'
                 ? workspace.spaces.find((space) => space.id === spaceId)?.name
-                : 'Dots'}
+                : view === 'swarm' || view === 'watchdog' || view === 'studio'
+                  ? 'Ecossistema Inteligente'
+                  : 'Dots'}
             </span>
             <span>/</span>
             <strong>
@@ -541,7 +585,13 @@ export function App() {
                   ? 'Activity'
                   : view === 'space'
                     ? 'Pages'
-                    : 'Memories'}
+                    : view === 'memories'
+                      ? 'Memories'
+                      : view === 'swarm'
+                        ? 'Swarm Multi-Agente'
+                        : view === 'watchdog'
+                          ? 'Guardião 24/7'
+                          : 'CineDot Studio'}
             </strong>
           </div>
           <div className="top-actions">
@@ -589,7 +639,13 @@ export function App() {
             All Dots are paused. Active compute stops and scheduled tasks wait.
           </div>
         )}
-        {view === 'space' ? (
+        {view === 'swarm' ? (
+          <SwarmView />
+        ) : view === 'watchdog' ? (
+          <WatchdogView />
+        ) : view === 'studio' ? (
+          <CineDotStudio />
+        ) : view === 'space' ? (
           <SpaceWorkspace
             key={spaceId}
             space={
