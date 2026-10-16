@@ -141,6 +141,20 @@ export class DotAgent extends AbstractAgent {
             this.abortRun();
           }
         }, 100);
+        for (const msg of input.messages) {
+          if (
+            (msg.role === 'user' || msg.role === 'assistant') &&
+            typeof msg.content === 'string' &&
+            msg.content.trim()
+          ) {
+            this.workspace.saveMessage(
+              input.threadId,
+              msg.role,
+              msg.content,
+              msg.id,
+            );
+          }
+        }
         const computer = new ComputerService(
           this.workspace,
           this.config,
@@ -321,7 +335,10 @@ export class DotAgent extends AbstractAgent {
         this.inner = new BuiltInAgent({
           type: 'tanstack',
           learnedSkills:
-            dot.skillDeliveryEnabled && conversation.learningContainerId
+            dot.skillDeliveryEnabled &&
+            conversation.learningContainerId &&
+            this.config.intelligenceKey &&
+            this.config.intelligenceKey !== 'local'
               ? {
                   containers: [{ id: conversation.learningContainerId }],
                   apiKey: this.config.intelligenceKey,
@@ -366,6 +383,8 @@ export class DotAgent extends AbstractAgent {
             });
           },
         });
+        let assistantText = '';
+        let saved = false;
         subscription = this.inner
           .run({
             ...input,
@@ -383,10 +402,30 @@ export class DotAgent extends AbstractAgent {
                 observe({ type: EventType.RUN_ERROR });
               observe(event);
               if (
+                (event.type === EventType.TEXT_MESSAGE_CHUNK ||
+                  event.type === EventType.TEXT_MESSAGE_CONTENT) &&
+                typeof (event as any).delta === 'string'
+              ) {
+                assistantText += (event as any).delta;
+              }
+              if (
                 event.type === EventType.RUN_ERROR ||
                 event.type === EventType.RUN_FINISHED
               )
                 finished = true;
+              if (
+                (event.type === EventType.RUN_FINISHED ||
+                  event.type === EventType.TEXT_MESSAGE_END) &&
+                !saved &&
+                assistantText.trim()
+              ) {
+                saved = true;
+                this.workspace.saveMessage(
+                  input.threadId,
+                  'assistant',
+                  assistantText.trim(),
+                );
+              }
               subscriber.next(
                 this.channel && event.type === EventType.RUN_ERROR
                   ? channelError()
@@ -404,6 +443,13 @@ export class DotAgent extends AbstractAgent {
               } else subscriber.error(error);
             },
             complete: () => {
+              if (assistantText.trim()) {
+                this.workspace.saveMessage(
+                  input.threadId,
+                  'assistant',
+                  assistantText,
+                );
+              }
               if (controller.signal.aborted && !finished)
                 observe({ type: EventType.RUN_ERROR });
               if (timedOut && !finished) {

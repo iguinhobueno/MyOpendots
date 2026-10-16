@@ -24,7 +24,9 @@ export class WorkspaceStore {
       CREATE TABLE IF NOT EXISTS thread_bindings(id TEXT PRIMARY KEY, dotId TEXT NOT NULL, ownerId TEXT NOT NULL, title TEXT NOT NULL, createdAt INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS task_threads(taskId TEXT PRIMARY KEY, threadId TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS calls(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, startedAt INTEGER NOT NULL, endedAt INTEGER, status TEXT NOT NULL, transcript TEXT NOT NULL, error TEXT);
-      CREATE TABLE IF NOT EXISTS captures(threadId TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS captures(threadId TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, threadId TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, createdAt INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS idx_messages_threadId ON messages(threadId);`);
     for (const [table, column, definition] of [
       ['dots', 'learningContainerId', 'TEXT'],
       ['dots', 'skillDeliveryEnabled', 'INTEGER NOT NULL DEFAULT 0'],
@@ -368,5 +370,39 @@ export class WorkspaceStore {
       .prepare('SELECT value FROM captures WHERE threadId=?')
       .get(threadId);
     return typeof row?.value === 'string' ? JSON.parse(row.value) : null;
+  }
+  saveMessage(
+    threadId: string,
+    role: string,
+    content: string,
+    id: string = randomUUID(),
+  ): { id: string; threadId: string; role: string; content: string; createdAt: number } {
+    this.requireThread(threadId);
+    const existing = this.db
+      .prepare('SELECT createdAt FROM messages WHERE id=?')
+      .get(id) as { createdAt?: number } | undefined;
+    const createdAt = existing?.createdAt ?? Date.now();
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO messages (id, threadId, role, content, createdAt) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(id, threadId, role, content, createdAt);
+    return { id, threadId, role, content, createdAt };
+  }
+  getMessages(
+    threadId: string,
+  ): { id: string; threadId: string; role: string; content: string; createdAt: number }[] {
+    this.requireThread(threadId);
+    return this.db
+      .prepare(
+        'SELECT id, threadId, role, content, createdAt FROM messages WHERE threadId=? ORDER BY createdAt ASC',
+      )
+      .all(threadId) as unknown as {
+      id: string;
+      threadId: string;
+      role: string;
+      content: string;
+      createdAt: number;
+    }[];
   }
 }

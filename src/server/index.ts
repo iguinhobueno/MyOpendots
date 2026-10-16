@@ -14,6 +14,7 @@ import {
   intelligenceWsUrlFromEnv,
   type PlatformConfig,
 } from './platform-config.js';
+import { research } from './research.js';
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? 4310);
 const ownerToken = process.env.OWNER_TOKEN;
@@ -72,17 +73,26 @@ const researchConfig = {
 const runner = new Runner(
   store,
   researchConfig,
-  async (claim, _memories, signal, progress) => {
-    const threadId = workspace.taskThread(claim.id);
-    if (!threadId)
-      throw new Error(
-        'This legacy task has no Intelligence conversation. Create a new scheduled task from a conversation.',
-      );
-    progress('Running this task in its Intelligence conversation.');
-    const text = await platform.turn(threadId, claim.prompt, signal, {
-      opendotsSource: 'scheduled_task',
-    });
-    return { text, sources: [], sample: false };
+  async (claim, memories, signal, progress) => {
+    if (config.intelligenceKey) {
+      const threadId = workspace.taskThread(claim.id);
+      if (threadId) {
+        progress('Running this task in its Intelligence conversation.');
+        const text = await platform.turn(threadId, claim.prompt, signal, {
+          opendotsSource: 'scheduled_task',
+        });
+        return { text, sources: [], sample: false };
+      }
+    }
+    progress('Executing automated research via live web search and model.');
+    const result = await research(
+      claim.prompt,
+      memories,
+      researchConfig,
+      signal,
+      progress,
+    );
+    return result;
   },
 );
 const wsOrigin = new URL(
